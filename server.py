@@ -6,12 +6,12 @@ import time
 CHUNK_SIZE = 1024  # 1 KB chunks
 
 def calculate_checksum(file_path):
-    """Compute SHA-256 checksum of a file."""
-    sha256 = hashlib.sha256()
+    """Compute MD5 checksum of a file."""
+    md5 = hashlib.md5()
     with open(file_path, 'rb') as f:
         while chunk := f.read(CHUNK_SIZE):
-            sha256.update(chunk)
-    return sha256.hexdigest()
+            md5.update(chunk)
+    return md5.hexdigest()
 
 def send_file(conn, file_path):
     """Send file in chunks to the client."""
@@ -27,9 +27,10 @@ def send_file(conn, file_path):
         return
 
     checksum = calculate_checksum(file_path)
-    conn.sendall(f"{file_size}".encode().ljust(16))  # Send file size as 16-byte header
+    conn.sendall(f"{file_size}".encode().ljust(16))  # Send file size as fixed 16-byte header
 
-    print(f"📤 Sending file: {file_path} ({file_size} bytes)")
+    print(f"📤 Sending file: {file_path} (size: {file_size} bytes)")
+    print(f"🔢 Calculated checksum: {checksum}")
 
     try:
         with open(file_path, 'rb') as f:
@@ -41,7 +42,7 @@ def send_file(conn, file_path):
                 conn.sendall(chunk_id.to_bytes(4, 'big') + chunk)
                 print(f"✅ Sent chunk {chunk_id} ({len(chunk)} bytes)")
                 chunk_id += 1
-                time.sleep(0.01)  # Small delay to avoid overwhelming the network
+                time.sleep(0.01)  # Small delay for stability
 
         conn.sendall(b'END' + checksum.encode())  # Signal end of transmission
         print("✅ File sent successfully.")
@@ -57,14 +58,12 @@ def start_server(host='127.0.0.1', port=65433):
         server_socket.listen()
         print(f"🚀 Server listening on {host}:{port}")
 
-        while True:
-            conn, addr = server_socket.accept()
-            with conn:
-                print(f"✅ Connected by {addr}")
-                file_path = conn.recv(1024).decode().strip()
-                if file_path:
-                    print(f"📂 Requested file: {file_path}")
-                    send_file(conn, file_path)
+        conn, addr = server_socket.accept()
+        with conn:
+            print(f"✅ Connected by {addr}")
+            file_path = conn.recv(1024).decode().strip()
+            print(f"📂 Requested file: {file_path}")
+            send_file(conn, file_path)
 
 if __name__ == "__main__":
     start_server()
