@@ -5,12 +5,12 @@ import os
 CHUNK_SIZE = 1024  # 1 KB chunks
 
 def calculate_checksum(file_path):
-    """Compute SHA-256 checksum of a file."""
-    sha256 = hashlib.sha256()
+    """Compute MD5 checksum of a file."""
+    md5 = hashlib.md5()
     with open(file_path, 'rb') as f:
         while chunk := f.read(CHUNK_SIZE):
-            sha256.update(chunk)
-    return sha256.hexdigest()
+            md5.update(chunk)
+    return md5.hexdigest()
 
 def receive_file(client_socket, file_path):
     """Receive file in chunks and verify integrity."""
@@ -24,12 +24,12 @@ def receive_file(client_socket, file_path):
         return
 
     file_size = int(file_size_data)
-    print(f"📥 Receiving file as {file_path} ({file_size} bytes)")
+    print(f"📥 Receiving file: {file_path} (size: {file_size} bytes)")
 
     received_size = 0
     while received_size < file_size:
         data = client_socket.recv(4 + CHUNK_SIZE)
-        if len(data) < 4:  # Ensure we received at least chunk ID
+        if len(data) < 4:
             print("❌ Error: Received incomplete chunk header.")
             break
 
@@ -45,16 +45,10 @@ def receive_file(client_socket, file_path):
         print(f"✅ Received chunk {chunk_id} ({len(chunk_data)} bytes)")
 
     # Receiving checksum
-    data = b""
-    while True:
-        part = client_socket.recv(1024)
-        if not part:
-            break
-        data += part
-        if data.startswith(b'END'):
-            expected_checksum = data[3:].decode()
-            print("✅ Checksum received.")
-            break
+    data = client_socket.recv(1024)
+    if data.startswith(b'END'):
+        expected_checksum = data[3:].decode()
+        print(f"🔢 Received checksum: {expected_checksum}")
 
     if not chunks:
         print("❌ No data received, transfer failed.")
@@ -67,9 +61,10 @@ def receive_file(client_socket, file_path):
 
     # Verify checksum
     actual_checksum = calculate_checksum(file_path)
+    print(f"🔍 Calculated checksum: {actual_checksum}")
 
     if actual_checksum == expected_checksum:
-        print("🎉 Transfer Successful. Checksum verified.")
+        print("🎉 Transfer Successful.")
     else:
         print("❌ Transfer Failed. Checksum mismatch.")
 
